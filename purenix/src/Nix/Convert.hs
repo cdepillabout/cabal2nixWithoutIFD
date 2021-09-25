@@ -176,7 +176,7 @@ unbinder (LiteralBinder ann lit) scrut' = localAnn ann $ litBinder lit scrut'
 attrs :: [(PSString, Expr Ann)] -> Convert N.Expr
 attrs = fmap (N.attrs [] []) . traverse attr
   where
-    attr (string, body) = (stringToKey string,) <$> expr body
+    attr (string, body) = (N.stringKey string,) <$> expr body
 
 stringToKey :: PSString -> N.Key
 stringToKey = N.UnsafeKey . P.prettyPrintObjectKey
