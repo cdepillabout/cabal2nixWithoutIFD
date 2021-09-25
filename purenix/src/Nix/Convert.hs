@@ -178,9 +178,6 @@ attrs = fmap (N.attrs [] []) . traverse attr
   where
     attr (string, body) = (N.stringKey string,) <$> expr body
 
-stringToKey :: PSString -> N.Key
-stringToKey = N.UnsafeKey . P.prettyPrintObjectKey
-
 string :: PSString -> Convert Text
 string str = case decodeString str of
   Nothing -> throw "String contained lone surrogates"
