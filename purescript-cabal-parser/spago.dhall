@@ -2,8 +2,8 @@
 
 , dependencies =
     [ "parser-combinator"
-	, "prelude"
-	]
+    , "prelude"
+    ]
 
 , packages = ../packages.dhall
 

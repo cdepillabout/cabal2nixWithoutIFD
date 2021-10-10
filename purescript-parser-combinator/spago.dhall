@@ -2,8 +2,8 @@
 
 , dependencies =
     [ "prelude"
-	, "tuples"
-	]
+    , "tuples"
+    ]
 
 , backend = "purenix"
 
