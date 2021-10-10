@@ -1,16 +1,6 @@
 { name = "parser-combinator"
-
-, dependencies =
-    [ "prelude"
-    , "tuples"
-    ]
-
+, dependencies = [ "control", "either", "prelude", "tuples" ]
 , backend = "purenix"
-
 , packages = ../packages.dhall
-
-, sources =
-    [ "src/**/*.purs"
-    -- , "test/**/*.purs"
-    ]
+, sources = [ "src/**/*.purs" ]
 }
