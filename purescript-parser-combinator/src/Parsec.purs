@@ -12,6 +12,7 @@ import Control.Alt (class Alt)
 import Control.Alternative (class Alternative)
 import Control.Plus (class Plus)
 import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\), type (/\))
 import NixBuiltins (stringLength, substring)
 
@@ -99,6 +100,26 @@ chars n = Parser \str i err ok ng ->
     in
     ng (err <> Err i errMsg)
 
+optional :: forall a. Parser a -> Parser (Maybe a)
+optional p = Parser go
+  where
+  go
+    :: forall b
+     . String
+    -> Int
+    -> Err
+    -> (Maybe a -> Int -> Err -> b)
+    -> (Err -> b)
+    -> b
+  go str i err ok _ =
+    let newOk :: a -> Int -> Err -> b
+        newOk s i' err' = ok (Just s) i' err'
+
+        newNg :: Err -> b
+        newNg _ = ok Nothing i err
+    in
+    unParser p str i err newOk newNg
+
 eof :: Parser Unit
 eof = Parser \str i err ok ng ->
   if i >= stringLength str then
@@ -106,12 +127,31 @@ eof = Parser \str i err ok ng ->
   else
     ng (err <> Err i "not at eof")
 
--- {-# INLINE token #-}
--- token :: Parser t e t
--- token = Parser $ \t i e ok _ -> ok (t i) (i + 1) e
+-- test :: Parser String
+-- test = throwAt \throw -> do
+--   chars 3
 
--- {-# INLINE throwAt #-}
--- throwAt :: Semigroup e => ((forall err. e -> Parser t e err) -> Parser t e a) -> Parser t e a
--- throwAt k = Parser $ \t i e ok err ->
---   let throw' e = Parser $ \_ _ e' _ err' -> err' (e' <> Err i e)
---    in unParser (k throw') t i e ok err
+-- | Enter a context with a function to throw an error at the start of the context.
+-- | A simple motivating example is `expect`:
+-- |
+-- | ```purescript
+-- | expect :: forall a. Error -> (String -> Maybe a) -> Parser a
+-- | expect err f =
+-- |   P.throwAt \throw ->
+-- |      P.token >>= (maybe (throw err) pure <<< f)
+-- | ```
+-- |
+-- | In this example, we first consume a token, and then see if it matches our
+-- | expectation. However since consuming a token advanced the parser past the
+-- | token, simply throwing an error in place reports the error after the token.
+-- |
+-- | By having `throwAt` be the only way to throw errors, it's always clear and
+-- | explicit where you are reporting an error.
+throwAt
+  :: forall r
+   . ((forall a. String -> Parser a) -> Parser r)
+  -> Parser r
+throwAt k = Parser \str i err ok ng ->
+  let throw' :: forall x. String -> Parser x
+      throw' e = Parser \_ _ e' _ ng' -> ng' (e' <> Err i e)
+  in unParser (k throw') str i err ok ng
