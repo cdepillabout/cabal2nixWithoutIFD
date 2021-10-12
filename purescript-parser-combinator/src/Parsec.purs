@@ -11,8 +11,9 @@ import Prelude
 import Control.Alt (class Alt)
 import Control.Alternative (class Alternative)
 import Control.Plus (class Plus)
+import Control.MonadPlus (class MonadPlus)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), optional)
 import Data.Tuple.Nested ((/\), type (/\))
 import NixBuiltins (stringLength, substring)
 
@@ -27,7 +28,7 @@ instance semigroupErr :: Semigroup e => Semigroup (Err' e) where
 instance monoidErr :: Monoid e => Monoid (Err' e) where
   mempty = Err 0 mempty
 
-type Err = Err' String
+type Err = Err' (Array String)
 
 -- | A simple backtracking parser.
 -- Maintains the error message of whatever branch managed to consume the most input.
@@ -56,7 +57,7 @@ runParser ::
   forall a.
   String ->
   Parser a ->
-  Either (Int /\ String) (Int /\ a)
+  Either (Int /\ Array String) (Int /\ a)
 runParser s (Parser p) =
   p
     s
@@ -66,28 +67,34 @@ runParser s (Parser p) =
     (\(Err i e) -> Left (i /\ e))
 
 instance functorParser :: Functor Parser where
-  map f (Parser p) = Parser \s i e ok err -> p s i e (ok <<< f) err
+  map f (Parser p) = Parser \s i e ok err ->
+    p s i e (ok <<< f) err
 
 instance applyParser :: Apply Parser where
-  apply (Parser pf) (Parser pa) = Parser \t i e ok ng -> pf t i e (\f i' e' -> pa t i' e' (ok <<< f) ng) ng
+  apply :: forall a b. Parser (a -> b) -> Parser a -> Parser b
+  apply (Parser pf) (Parser pa) = Parser \t i e ok ng ->
+    pf t i e (\f i' e' -> pa t i' e' (ok <<< f) ng) ng
 
 instance applicativeParser :: Applicative Parser where
   pure a = Parser \_ i e ok _ -> ok a i e
 
 instance bindParser :: Bind Parser where
-  bind (Parser k) f = Parser \t i e ok ng -> k t i e (\a i' e' -> unParser (f a) t i' e' ok ng) ng
+  bind :: forall a b. Parser a -> (a -> Parser b) -> Parser b
+  bind (Parser k) f = Parser \t i e ok ng ->
+    k t i e (\a i' e' -> unParser (f a) t i' e' ok ng) ng
 
 instance monadParser :: Monad Parser
 
 instance altParser :: Alt Parser where
   alt (Parser pl) (Parser pr) = Parser \t i e ok ng ->
-    pl t i e ok $ \e' ->
-      pr t i e' ok ng
+    pl t i e ok \e' -> pr t i e' ok ng
 
 instance plusParser :: Plus Parser where
   empty = Parser \_ _ e _ ng -> ng e
 
 instance alternativeParser :: Alternative Parser
+
+instance monadPlusParser :: MonadPlus Parser
 
 chars :: Int -> Parser String
 chars n = Parser \str i err ok ng ->
@@ -98,38 +105,43 @@ chars n = Parser \str i err ok ng ->
   else
     let errMsg = "not enough characters left in Parser to parse " <> show n <> " chars"
     in
-    ng (err <> Err i errMsg)
+    ng (err <> Err i [errMsg])
 
-optional :: forall a. Parser a -> Parser (Maybe a)
-optional p = Parser go
-  where
-  go
-    :: forall b
-     . String
-    -> Int
-    -> Err
-    -> (Maybe a -> Int -> Err -> b)
-    -> (Err -> b)
-    -> b
-  go str i err ok _ =
-    let newOk :: a -> Int -> Err -> b
-        newOk s i' err' = ok (Just s) i' err'
+-- optional :: forall a. Parser a -> Parser (Maybe a)
+-- optional p = Parser go
+--   where
+--   go
+--     :: forall b
+--      . String
+--     -> Int
+--     -> Err
+--     -> (Maybe a -> Int -> Err -> b)
+--     -> (Err -> b)
+--     -> b
+--   go str i err ok _ =
+--     let newOk :: a -> Int -> Err -> b
+--         newOk s i' err' = ok (Just s) i' err'
 
-        newNg :: Err -> b
-        newNg _ = ok Nothing i err
-    in
-    unParser p str i err newOk newNg
+--         newNg :: Err -> b
+--         newNg _ = ok Nothing i err
+--     in
+--     unParser p str i err newOk newNg
 
 eof :: Parser Unit
 eof = Parser \str i err ok ng ->
   if i >= stringLength str then
     ok unit i err
   else
-    ng (err <> Err i "not at eof")
+    ng (err <> Err i ["not at eof"])
 
--- test :: Parser String
--- test = throwAt \throw -> do
---   chars 3
+test :: Parser String
+test = throwAt \throw -> do
+  res1 <- optional (chars 3)
+  res2 <- optional (chars 3)
+  case res1, res2 of
+    Nothing, _ -> throw "no first value yo"
+    Just _, Nothing -> throw "no second value yo"
+    Just str1, Just str2 -> pure $ str1 <> str2
 
 -- | Enter a context with a function to throw an error at the start of the context.
 -- | A simple motivating example is `expect`:
@@ -153,5 +165,5 @@ throwAt
   -> Parser r
 throwAt k = Parser \str i err ok ng ->
   let throw' :: forall x. String -> Parser x
-      throw' e = Parser \_ _ e' _ ng' -> ng' (e' <> Err i e)
+      throw' e = Parser \_ _ e' _ ng' -> ng' (e' <> Err i [e])
   in unParser (k throw') str i err ok ng
