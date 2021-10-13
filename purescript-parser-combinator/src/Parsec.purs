@@ -134,14 +134,14 @@ eof = Parser \str i err ok ng ->
   else
     ng (err <> Err i ["not at eof"])
 
-test :: Parser String
-test = throwAt \throw -> do
-  res1 <- optional (chars 3)
-  res2 <- optional (chars 3)
-  case res1, res2 of
-    Nothing, _ -> throw "no first value yo"
-    Just _, Nothing -> throw "no second value yo"
-    Just str1, Just str2 -> pure $ str1 <> str2
+-- test :: Parser String
+-- test = throwAt \throw -> do
+--   res1 <- optional (chars 3)
+--   res2 <- optional (chars 3)
+--   case res1, res2 of
+--     Nothing, _ -> throw "no first value yo"
+--     Just _, Nothing -> throw "no second value yo"
+--     Just str1, Just str2 -> pure $ str1 <> str2
 
 -- | Enter a context with a function to throw an error at the start of the context.
 -- | A simple motivating example is `expect`:
