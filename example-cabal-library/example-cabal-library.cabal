@@ -1,0 +1,10 @@
+cabal-version:      2.4
+name:               example-cabal-library
+version:            0.1.0.0
+license:            BSD3
+
+executable example-cabal-library
+  main-is:          Main.hs
+  build-depends:    base ^>=4.14.1.0, aeson
+  hs-source-dirs:   app
+  default-language: Haskell2010
