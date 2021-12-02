@@ -1,7 +1,16 @@
 module Main where
 
 import Prelude
+
+import Control.Alt ((<|>))
+import Control.Plus (empty)
+import Data.Array (many)
+import NixBuiltins (charArrayToStr)
 import Parsec
+import Unsafe.Coerce (unsafeCoerce)
+
+undefined :: forall a. a
+undefined = unsafeCoerce unit
 
 type Executable =
   { name :: String
@@ -21,7 +30,30 @@ data RawProp = SimpleRawProp String String | RecursiveRawProp String RawProp
 
 data RawCabalFile = RawCabalFile (Array RawProp)
 
+parseRawPropKey :: Parser String
+parseRawPropKey = map charArrayToStr (many (notChar ':'))
+
+parseRawPropVal :: Parser String
+parseRawPropVal = do
+  val <- map charArrayToStr (many (notChar '\n'))
+  char '\n'
+  pure val
+
+parseSimpleRawProp :: Parser RawProp
+parseSimpleRawProp = do
+  key <- parseRawPropKey
+  char ':'
+  val <- parseRawPropVal
+  pure $ SimpleRawProp key val
+
+parseRecursiveRawProp :: Parser RawProp
+parseRecursiveRawProp = empty
+
+parseRawProp :: Parser RawProp
+parseRawProp = parseRecursiveRawProp <|> parseSimpleRawProp
+
 parseRawCabalFile :: Parser RawCabalFile
+parseRawCabalFile = map RawCabalFile (many parseRawProp)
 
 -- cabalParser :: Parser CabalFile
 -- cabalParser = do

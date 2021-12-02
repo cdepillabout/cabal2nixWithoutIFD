@@ -10,12 +10,13 @@ import Prelude
 
 import Control.Alt (class Alt)
 import Control.Alternative (class Alternative)
-import Control.Plus (class Plus)
 import Control.MonadPlus (class MonadPlus)
+import Control.Lazy (class Lazy)
+import Control.Plus (class Plus)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), optional)
 import Data.Tuple.Nested ((/\), type (/\))
-import NixBuiltins (stringLength, substring)
+import NixBuiltins (charToStr, stringLength, substring, unsafeStrToChar)
 
 data Err' e = Err Int e
 
@@ -96,6 +97,16 @@ instance alternativeParser :: Alternative Parser
 
 instance monadPlusParser :: MonadPlus Parser
 
+-- This isn't actually needed, since PureNix is already Lazy, but some things in
+-- the PureScript stdlib are using Lazy.
+instance lazyParser :: Lazy (Parser a) where
+  defer :: (Unit -> Parser a) -> Parser a
+  defer f = Parser \t i e ok ng -> unParser (f unit) t i e ok ng
+
+----------------
+-- Primitives --
+----------------
+
 chars :: Int -> Parser String
 chars n = Parser \str i err ok ng ->
   let endOffset = i + n
@@ -167,3 +178,43 @@ throwAt k = Parser \str i err ok ng ->
   let throw' :: forall x. String -> Parser x
       throw' e = Parser \_ _ e' _ ng' -> ng' (e' <> Err i [e])
   in unParser (k throw') str i err ok ng
+
+-----------------
+-- Combinators --
+-----------------
+
+-- many :: MonadPlus m => m a -> m (Array a)
+-- many p = go id
+--   where
+--     go f = do
+--       r <- C.optional p
+--       case r of
+--         Nothing -> return (f [])
+--         Just x -> go (f . (x :))
+
+char :: Char -> Parser Unit
+char c =
+  void $
+    satisfyNote
+      (_ == c)
+      (\parsedChar ->
+        "expected character '" <> charToStr c <>
+        "', but got '" <> charToStr parsedChar <> "'"
+      )
+
+notChar :: Char -> Parser Char
+notChar c =
+  satisfyNote
+    (_ /= c)
+    (\parsedChar ->
+      "expected any character but '" <> charToStr c <>
+      "', but got '" <> charToStr parsedChar
+    )
+
+satisfyNote :: (Char -> Boolean) -> (Char -> String) -> Parser Char
+satisfyNote f errMsg =
+  throwAt \throw -> do
+    parsedChar <- map unsafeStrToChar (chars 1)
+    if f parsedChar
+      then pure parsedChar
+      else throw (errMsg parsedChar)
