@@ -1,24 +1,30 @@
-module Main (module Main, module Dep) where
+module Main where
 
-import Dep
+import Prelude
+import Parsec
 
--- import Prelude
+type Executable =
+  { name :: String
+  , buildDepends :: Array String
+  }
 
--- import Effect (Effect)
--- import Effect.Console (log)
+data License = LicenseBSD3
 
--- main :: Effect Unit
--- main = do
---   log "🍝"
+type CabalFile =
+  { name :: String
+  , version :: String
+  , license :: License
+  , executable :: Executable
+  }
 
-myId :: forall a. a -> a
-myId a = a
+data RawProp = SimpleRawProp String String | RecursiveRawProp String RawProp
 
-myNum :: Int
-myNum = myId myDep
+data RawCabalFile = RawCabalFile (Array RawProp)
 
-foreign import mySubstring :: Int -> Int -> String -> String
+parseRawCabalFile :: Parser RawCabalFile
 
--- | Output the string `"nix"`.
-useMySubstring :: String
-useMySubstring = mySubstring 0 3 "nixos"
+-- cabalParser :: Parser CabalFile
+-- cabalParser = do
+--   rawCabalFile <- parseRawCabalFile
+--   pure undefined
+
