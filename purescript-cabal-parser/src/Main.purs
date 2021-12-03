@@ -5,7 +5,9 @@ import Prelude
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Array (many)
-import NixBuiltins (charArrayToStr)
+import Data.Either (Either)
+import Data.Tuple.Nested (type (/\))
+import NixBuiltins (concatChars)
 import Parsec
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -31,11 +33,11 @@ data RawProp = SimpleRawProp String String | RecursiveRawProp String RawProp
 data RawCabalFile = RawCabalFile (Array RawProp)
 
 parseRawPropKey :: Parser String
-parseRawPropKey = map charArrayToStr (many (notChar ':'))
+parseRawPropKey = map concatChars (many (notChar ':'))
 
 parseRawPropVal :: Parser String
 parseRawPropVal = do
-  val <- map charArrayToStr (many (notChar '\n'))
+  val <- map concatChars (many (notChar '\n'))
   char '\n'
   pure val
 

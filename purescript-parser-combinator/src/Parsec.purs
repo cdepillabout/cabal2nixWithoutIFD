@@ -9,14 +9,15 @@ where
 import Prelude
 
 import Control.Alt (class Alt)
-import Control.Alternative (class Alternative)
+import Control.Alternative (class Alternative, (<|>))
 import Control.MonadPlus (class MonadPlus)
 import Control.Lazy (class Lazy)
 import Control.Plus (class Plus)
+import Data.Array ((:))
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), optional)
 import Data.Tuple.Nested ((/\), type (/\))
-import NixBuiltins (charToStr, stringLength, substring, unsafeStrToChar)
+import NixBuiltins (charToStr, stringLength, substring, trace, unsafeStrToChar)
 
 data Err' e = Err Int e
 
@@ -112,7 +113,7 @@ chars n = Parser \str i err ok ng ->
   let endOffset = i + n
   in
   if stringLength str >= endOffset then
-    ok (substring i endOffset str) endOffset err
+    ok (substring i n str) endOffset err
   else
     let errMsg = "not enough characters left in Parser to parse " <> show n <> " chars"
     in
@@ -182,15 +183,6 @@ throwAt k = Parser \str i err ok ng ->
 -----------------
 -- Combinators --
 -----------------
-
--- many :: MonadPlus m => m a -> m (Array a)
--- many p = go id
---   where
---     go f = do
---       r <- C.optional p
---       case r of
---         Nothing -> return (f [])
---         Just x -> go (f . (x :))
 
 char :: Char -> Parser Unit
 char c =
