@@ -5,9 +5,11 @@ import Prelude
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Array (many, some)
-import Data.Either (Either)
-import Data.Tuple.Nested (type (/\))
-import NixBuiltins (concatChars)
+import Data.Either (Either(Left, Right))
+import Data.Generic.Rep (class Generic)
+import Data.Show.Generic (genericShow)
+import Data.Tuple.Nested ((/\), type (/\))
+import NixBuiltins (Path, concatChars, readFile, trace)
 import Parsec
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -32,7 +34,17 @@ type IndentAmount = Int
 
 data RawProp = SimpleRawProp String String | RecursiveRawProp String String (Array RawProp)
 
+derive instance genericRawProp :: Generic RawProp _
+
+instance showRawProp :: Show RawProp where
+  show rawProp = genericShow rawProp
+
 data RawCabalFile = RawCabalFile (Array RawProp)
+
+derive instance genericRawCabalFile :: Generic RawCabalFile _
+
+instance showRawCabalFile :: Show RawCabalFile where
+  show = genericShow
 
 parseRawPropKey :: Parser String
 parseRawPropKey = map concatChars (some (notChar ':'))
@@ -64,6 +76,7 @@ parseRecursiveRawProp indentAmount = do
 
 parseRawProp :: IndentAmount -> Parser RawProp
 parseRawProp indentAmount = do
+  void $ many (char '\n')
   void $ count indentAmount space
   parseRecursiveRawProp indentAmount <|> parseSimpleRawProp
 
@@ -73,8 +86,16 @@ parseRawProps indentAmount = some (parseRawProp indentAmount)
 parseRawCabalFile :: Parser RawCabalFile
 parseRawCabalFile = map RawCabalFile (parseRawProps 0)
 
--- cabalParser :: Parser CabalFile
--- cabalParser = do
---   rawCabalFile <- parseRawCabalFile
---   pure undefined
+foreign import cabalFilePath :: Path
 
+rawCabalFileStr :: String
+rawCabalFileStr = readFile cabalFilePath
+
+parsedRawCabalFile ::  Either (Int /\ Array String) (Int /\ RawCabalFile)
+parsedRawCabalFile = runParser rawCabalFileStr parseRawCabalFile
+
+cabalParser :: Either (Array String) CabalFile
+cabalParser = do
+  case parsedRawCabalFile of
+    Left (_ /\ err) -> Left err
+    Right (_ /\ rawCabalFile) -> trace (show rawCabalFile) undefined -- (Right rawCabalFile)
