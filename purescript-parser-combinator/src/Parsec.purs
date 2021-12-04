@@ -13,11 +13,12 @@ import Control.Alternative (class Alternative, (<|>))
 import Control.MonadPlus (class MonadPlus)
 import Control.Lazy (class Lazy)
 import Control.Plus (class Plus)
-import Data.Array ((:))
+import Data.Array (replicate, some, (:))
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), optional)
+import Data.Traversable (sequence)
 import Data.Tuple.Nested ((/\), type (/\))
-import NixBuiltins (charToStr, stringLength, substring, trace, unsafeStrToChar)
+import NixBuiltins (charToStr, concatChars, stringLength, substring, trace, unsafeStrToChar)
 
 data Err' e = Err Int e
 
@@ -210,3 +211,87 @@ satisfyNote f errMsg =
     if f parsedChar
       then pure parsedChar
       else throw (errMsg parsedChar)
+
+isAlphaNum :: Char -> Boolean
+isAlphaNum =
+  case _ of
+    'A' -> true
+    'B' -> true
+    'C' -> true
+    'D' -> true
+    'E' -> true
+    'F' -> true
+    'G' -> true
+    'H' -> true
+    'I' -> true
+    'J' -> true
+    'K' -> true
+    'L' -> true
+    'M' -> true
+    'N' -> true
+    'O' -> true
+    'P' -> true
+    'Q' -> true
+    'R' -> true
+    'S' -> true
+    'T' -> true
+    'U' -> true
+    'V' -> true
+    'W' -> true
+    'X' -> true
+    'Y' -> true
+    'Z' -> true
+    'a' -> true
+    'b' -> true
+    'c' -> true
+    'd' -> true
+    'e' -> true
+    'f' -> true
+    'g' -> true
+    'h' -> true
+    'i' -> true
+    'j' -> true
+    'k' -> true
+    'l' -> true
+    'm' -> true
+    'n' -> true
+    'o' -> true
+    'p' -> true
+    'q' -> true
+    'r' -> true
+    's' -> true
+    't' -> true
+    'u' -> true
+    'v' -> true
+    'w' -> true
+    'x' -> true
+    'y' -> true
+    'z' -> true
+    '0' -> true
+    '1' -> true
+    '2' -> true
+    '3' -> true
+    '4' -> true
+    '5' -> true
+    '6' -> true
+    '7' -> true
+    '8' -> true
+    '9' -> true
+    _ -> false
+
+alphaNum :: Parser Char
+alphaNum =
+  satisfyNote
+    isAlphaNum
+    (\c ->
+      "Trying to parse A-Z or a-z or 0-9, but got character '" <> charToStr c <> "'"
+    )
+
+alphaNums :: Parser String
+alphaNums = map concatChars (some alphaNum)
+
+space :: Parser Unit
+space = char ' ' <|> char '\t'
+
+count :: forall a. Int -> Parser a -> Parser (Array a)
+count i p = sequence $ replicate i p
