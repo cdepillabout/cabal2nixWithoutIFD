@@ -4,9 +4,10 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Plus (empty)
-import Data.Array (many, some)
+import Data.Array (findMap, many, some)
 import Data.Either (Either(Left, Right))
 import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe(Just, Nothing))
 import Data.Show.Generic (genericShow)
 import Data.Tuple.Nested ((/\), type (/\))
 import NixBuiltins (Path, concatChars, readFile, trace)
@@ -91,11 +92,70 @@ foreign import cabalFilePath :: Path
 rawCabalFileStr :: String
 rawCabalFileStr = readFile cabalFilePath
 
+licenseParser :: Parser License
+licenseParser =
+  oneOf [ string "BSD3" $> LicenseBSD3 ]
+
+buildDependsParser :: Parser (Array String)
+buildDependsParser = undefined
+
 parsedRawCabalFile ::  Either (Int /\ Array String) (Int /\ RawCabalFile)
 parsedRawCabalFile = runParser rawCabalFileStr parseRawCabalFile
+
+getSimpleProp :: String -> Array RawProp -> Either (Array String) String
+getSimpleProp key rawProps =
+  case findMap pred rawProps of
+    Nothing -> Left [ "could not find key " <> key ]
+    Just val -> Right val
+  where
+    pred :: RawProp -> Maybe String
+    pred =
+      case _ of
+        SimpleRawProp key' val | key' == key -> Just val
+        _ -> Nothing
+
+getSimplePropParse
+  :: forall a. Parser a -> String -> Array RawProp -> Either (Array String) a
+getSimplePropParse parser key rawProps = do
+  rawVal <- getSimpleProp key rawProps
+  case runParser rawVal parser of
+    Left (_ /\ err) -> Left err
+    Right (_ /\ parsedVal) -> Right parsedVal
+
+getRecursiveProp
+  :: String -> Array RawProp -> Either (Array String) (String /\ Array RawProp)
+getRecursiveProp key rawProps = do
+  case findMap pred rawProps of
+    Nothing -> Left [ "could not find key " <> key ]
+    Just r -> Right r
+  where
+    pred :: RawProp -> Maybe (String /\ Array RawProp)
+    pred =
+      case _ of
+        RecursiveRawProp key' val inner | key' == key -> Just (val /\ inner)
+        _ -> Nothing
+
+cabalFileFromRaw :: RawCabalFile -> Either (Array String) CabalFile
+cabalFileFromRaw (RawCabalFile rawProps) = do
+  name <- getSimpleProp "name" rawProps
+  version <- getSimpleProp "version" rawProps
+  license <- getSimplePropParse licenseParser "license" rawProps
+  executableName /\ executableProps <- getRecursiveProp "executable" rawProps
+  buildDepends <- getSimplePropParse buildDependsParser "build-depends" executableProps
+  pure
+    { name
+    , version
+    , license
+    , executable:
+        { name: executableName
+        , buildDepends
+        }
+    }
 
 cabalParser :: Either (Array String) CabalFile
 cabalParser = do
   case parsedRawCabalFile of
     Left (_ /\ err) -> Left err
-    Right (_ /\ rawCabalFile) -> trace (show rawCabalFile) undefined -- (Right rawCabalFile)
+    Right (_ /\ rawCabalFile) ->
+      -- trace (show rawCabalFile) undefined -- (Right rawCabalFile)
+      cabalFileFromRaw rawCabalFile

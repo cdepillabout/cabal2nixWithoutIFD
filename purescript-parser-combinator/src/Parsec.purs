@@ -8,12 +8,12 @@ where
 
 import Prelude
 
-import Control.Alt (class Alt)
+import Control.Alt (class Alt, alt)
 import Control.Alternative (class Alternative, (<|>))
 import Control.MonadPlus (class MonadPlus)
 import Control.Lazy (class Lazy)
-import Control.Plus (class Plus)
-import Data.Array (replicate, some, (:))
+import Control.Plus (class Plus, empty)
+import Data.Array (foldr, replicate, some, (:))
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), optional)
 import Data.Traversable (sequence)
@@ -295,3 +295,14 @@ space = char ' ' <|> char '\t'
 
 count :: forall a. Int -> Parser a -> Parser (Array a)
 count i p = sequence $ replicate i p
+
+string :: String -> Parser String
+string s =
+  throwAt \throw -> do
+    parsedChars <- chars (stringLength s)
+    if s == parsedChars
+      then pure s
+      else throw $ "expected string '" <> s <> "', but got string '" <> parsedChars <> "'"
+
+oneOf :: forall a. Array (Parser a) -> Parser a
+oneOf parsers = foldr alt empty parsers
