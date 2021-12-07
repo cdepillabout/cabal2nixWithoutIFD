@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Plus (empty)
-import Data.Array (findMap, many, some)
+import Data.Array (findMap, many, some, (:))
 import Data.Either (Either(Left, Right))
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(Just, Nothing))
@@ -94,7 +94,7 @@ rawCabalFileStr = readFile cabalFilePath
 
 licenseParser :: Parser License
 licenseParser =
-  oneOf [ string "BSD3" $> LicenseBSD3 ]
+  oneOf [ string "BSD-3-Clause" $> LicenseBSD3 ]
 
 buildDependParser :: Parser String
 buildDependParser = do
@@ -166,3 +166,52 @@ cabalParser = do
     Right (_ /\ rawCabalFile) ->
       -- trace (show rawCabalFile) undefined -- (Right rawCabalFile)
       cabalFileFromRaw rawCabalFile
+
+
+-- { mkDerivation, aeson, base, lib }:
+-- mkDerivation {
+--   pname = "example-cabal-library";
+--   version = "0.1.0.0";
+--   src = ./.;
+--   isLibrary = false;
+--   isExecutable = true;
+--   executableHaskellDepends = [ aeson base ];
+--   license = lib.licenses.bsd3;
+-- }
+
+-- TODO: I might be able to encode this in PureScript?
+foreign import data FunctionWithArgs :: Type
+
+foreign import data AttrSet :: Type
+
+foreign import unsafeGet :: forall a. String -> AttrSet -> a
+
+foreign import haskellPackagePath :: Path
+
+foreign import mkFunctionWithArgs
+  :: forall a. Array String -> (AttrSet -> a) -> FunctionWithArgs
+
+cabalFileToPackageDef :: CabalFile -> FunctionWithArgs
+cabalFileToPackageDef { name, version, license, executable } =
+  mkFunctionWithArgs
+    ("mkDerivation" : "lib" : executable.buildDepends)
+    \args ->
+      (unsafeGet "mkDerivation" args)
+        { pname: name
+        , version
+        , src: haskellPackagePath
+        , isLibrary: false
+        , isExecutable: true
+        -- TODO: Don't hard-code these, but pull them out dynamically based on
+        -- executable.buildDepends
+        , executableHaskellDepends: [ unsafeGet "aeson" args, unsafeGet "base" args ]
+        -- TODO: Get the correct license here.
+        , license: "hello"
+        }
+
+packageDef :: FunctionWithArgs
+packageDef =
+  case cabalParser of
+    -- TODO: Throw an error here or something.
+    Left err -> undefined
+    Right cabalFile -> cabalFileToPackageDef cabalFile
