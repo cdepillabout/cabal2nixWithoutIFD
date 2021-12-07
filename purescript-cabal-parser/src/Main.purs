@@ -96,8 +96,13 @@ licenseParser :: Parser License
 licenseParser =
   oneOf [ string "BSD3" $> LicenseBSD3 ]
 
+buildDependParser :: Parser String
+buildDependParser = do
+  undefined
+
 buildDependsParser :: Parser (Array String)
-buildDependsParser = undefined
+buildDependsParser =
+  sepBy1 buildDependParser (char ',' *> optional space)
 
 parsedRawCabalFile ::  Either (Int /\ Array String) (Int /\ RawCabalFile)
 parsedRawCabalFile = runParser rawCabalFileStr parseRawCabalFile

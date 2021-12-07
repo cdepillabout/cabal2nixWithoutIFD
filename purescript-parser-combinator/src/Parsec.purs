@@ -13,7 +13,7 @@ import Control.Alternative (class Alternative, (<|>))
 import Control.MonadPlus (class MonadPlus)
 import Control.Lazy (class Lazy)
 import Control.Plus (class Plus, empty)
-import Data.Array (foldr, replicate, some, (:))
+import Data.Array (foldr, many, replicate, some, (:))
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), optional)
 import Data.Traversable (sequence)
@@ -293,6 +293,9 @@ alphaNums = map concatChars (some alphaNum)
 space :: Parser Unit
 space = char ' ' <|> char '\t'
 
+spaces :: Parser Unit
+spaces = void $ some space
+
 count :: forall a. Int -> Parser a -> Parser (Array a)
 count i p = sequence $ replicate i p
 
@@ -306,3 +309,12 @@ string s =
 
 oneOf :: forall a. Array (Parser a) -> Parser a
 oneOf parsers = foldr alt empty parsers
+
+sepBy1 :: forall a sep. Parser a -> Parser sep -> Parser (Array a)
+sepBy1 p sep = do
+  fst <- p
+  rest <- many (sep *> p)
+  pure (fst : rest)
+
+optional :: forall a. Parser a -> Parser (Maybe a)
+optional v = map Just v <|> pure Nothing
