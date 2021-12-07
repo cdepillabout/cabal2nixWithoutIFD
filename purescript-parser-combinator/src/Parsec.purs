@@ -13,7 +13,7 @@ import Control.Alternative (class Alternative, (<|>))
 import Control.MonadPlus (class MonadPlus)
 import Control.Lazy (class Lazy)
 import Control.Plus (class Plus, empty)
-import Data.Array (foldr, many, replicate, some, (:))
+import Data.Array (foldr, many, notElem, replicate, some, (:))
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), optional)
 import Data.Traversable (sequence)
@@ -201,6 +201,15 @@ notChar c =
     (_ /= c)
     (\parsedChar ->
       "expected any character but '" <> charToStr c <>
+      "', but got '" <> charToStr parsedChar
+    )
+
+notChars :: Array Char -> Parser Char
+notChars cs =
+  satisfyNote
+    (\c -> notElem c cs)
+    (\parsedChar ->
+      "expected any character but '" <> show cs <>
       "', but got '" <> charToStr parsedChar
     )
 

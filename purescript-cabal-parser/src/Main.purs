@@ -98,7 +98,9 @@ licenseParser =
 
 buildDependParser :: Parser String
 buildDependParser = do
-  undefined
+  libName <- alphaNums
+  void $ many (notChars [',', '\n'])
+  pure libName
 
 buildDependsParser :: Parser (Array String)
 buildDependsParser =
