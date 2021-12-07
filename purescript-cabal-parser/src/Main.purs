@@ -180,14 +180,18 @@ cabalParser = do
 -- }
 
 -- TODO: I might be able to encode this in PureScript?
+-- Also, maybe move this to the Nix builtins file.
 foreign import data FunctionWithArgs :: Type
 
+-- TODO: Maybe move this to the Nix buildins file?
 foreign import data AttrSet :: Type
 
+-- TODO: Maybe move this to the Nix buildins file?
 foreign import unsafeGet :: forall a. String -> AttrSet -> a
 
 foreign import haskellPackagePath :: Path
 
+-- TODO: Maybe move this to the Nix builtins file.
 foreign import mkFunctionWithArgs
   :: forall a. Array String -> (AttrSet -> a) -> FunctionWithArgs
 
