@@ -15,10 +15,10 @@ import Control.Lazy (class Lazy)
 import Control.Plus (class Plus, empty)
 import Data.Array (foldr, many, notElem, replicate, some, (:))
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), optional)
+import Data.Maybe (Maybe(..))
 import Data.Traversable (sequence)
 import Data.Tuple.Nested ((/\), type (/\))
-import NixBuiltins (charToStr, concatChars, stringLength, substring, trace, unsafeStrToChar)
+import NixBuiltins (charToStr, concatChars, stringLength, substring, unsafeStrToChar)
 
 data Err' e = Err Int e
 
@@ -120,41 +120,12 @@ chars n = Parser \str i err ok ng ->
     in
     ng (err <> Err i [errMsg])
 
--- optional :: forall a. Parser a -> Parser (Maybe a)
--- optional p = Parser go
---   where
---   go
---     :: forall b
---      . String
---     -> Int
---     -> Err
---     -> (Maybe a -> Int -> Err -> b)
---     -> (Err -> b)
---     -> b
---   go str i err ok _ =
---     let newOk :: a -> Int -> Err -> b
---         newOk s i' err' = ok (Just s) i' err'
-
---         newNg :: Err -> b
---         newNg _ = ok Nothing i err
---     in
---     unParser p str i err newOk newNg
-
 eof :: Parser Unit
 eof = Parser \str i err ok ng ->
   if i >= stringLength str then
     ok unit i err
   else
     ng (err <> Err i ["not at eof"])
-
--- test :: Parser String
--- test = throwAt \throw -> do
---   res1 <- optional (chars 3)
---   res2 <- optional (chars 3)
---   case res1, res2 of
---     Nothing, _ -> throw "no first value yo"
---     Just _, Nothing -> throw "no second value yo"
---     Just str1, Just str2 -> pure $ str1 <> str2
 
 -- | Enter a context with a function to throw an error at the start of the context.
 -- | A simple motivating example is `expect`:
