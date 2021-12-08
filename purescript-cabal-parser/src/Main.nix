@@ -11,7 +11,4 @@
     { __functor = _: f;
       __functionArgs = builtins.listToAttrs (map (k: { name = k; value = false; }) argList);
     };
-
-  # :: forall a. String -> AttrSet -> a
-  unsafeGet = builtins.getAttr;
 }

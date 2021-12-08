@@ -3,9 +3,19 @@ module NixBuiltins where
 
 import Unsafe.Coerce (unsafeCoerce)
 
+-- | A Nix attribute set that can have any types as values.  This is generally
+-- | used from unsafe functions like `getAttr`.
+foreign import data AttrSet :: Type
+
 foreign import data Path :: Type
 
+foreign import attrByPath :: forall a. Array String  -> a -> AttrSet -> a
+
 foreign import concatStringsSep :: String -> Array String -> String
+
+foreign import getAttr :: forall a. String -> AttrSet -> a
+
+foreign import getAttrFromPath :: forall a. Array String  -> AttrSet -> a
 
 foreign import readFile :: Path -> String
 

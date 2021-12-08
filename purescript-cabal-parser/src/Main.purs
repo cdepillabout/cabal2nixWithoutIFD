@@ -3,15 +3,14 @@ module Main where
 import Prelude
 
 import Control.Alt ((<|>))
-import Control.Plus (empty)
 import Data.Array (findMap, many, some, (:))
 import Data.Either (Either(Left, Right))
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Show.Generic (genericShow)
 import Data.Tuple.Nested ((/\), type (/\))
-import NixBuiltins (Path, concatChars, readFile, trace)
-import Parsec
+import NixBuiltins (AttrSet, Path, concatChars, getAttr, getAttrFromPath, readFile)
+import Parsec (Parser, alphaNums, char, count, notChar, notChars, oneOf, optional, runParser, sepBy1, space, string)
 import Unsafe.Coerce (unsafeCoerce)
 
 undefined :: forall a. a
@@ -163,54 +162,50 @@ cabalParser :: Either (Array String) CabalFile
 cabalParser = do
   case parsedRawCabalFile of
     Left (_ /\ err) -> Left err
-    Right (_ /\ rawCabalFile) ->
-      -- trace (show rawCabalFile) undefined -- (Right rawCabalFile)
-      cabalFileFromRaw rawCabalFile
+    Right (_ /\ rawCabalFile) -> cabalFileFromRaw rawCabalFile
 
+licenseToAttrPath :: License -> Array String
+licenseToAttrPath =
+  case _ of
+    LicenseBSD3 -> ["lib", "licenses", "bsd3"]
 
--- { mkDerivation, aeson, base, lib }:
--- mkDerivation {
---   pname = "example-cabal-library";
---   version = "0.1.0.0";
---   src = ./.;
---   isLibrary = false;
---   isExecutable = true;
---   executableHaskellDepends = [ aeson base ];
---   license = lib.licenses.bsd3;
--- }
-
--- TODO: I might be able to encode this in PureScript?
--- Also, maybe move this to the Nix builtins file.
 foreign import data FunctionWithArgs :: Type
-
--- TODO: Maybe move this to the Nix buildins file?
-foreign import data AttrSet :: Type
-
--- TODO: Maybe move this to the Nix buildins file?
-foreign import unsafeGet :: forall a. String -> AttrSet -> a
 
 foreign import haskellPackagePath :: Path
 
--- TODO: Maybe move this to the Nix builtins file.
 foreign import mkFunctionWithArgs
   :: forall a. Array String -> (AttrSet -> a) -> FunctionWithArgs
 
+-- | Take an input `CabalFile` and convert it to a Nix function that is
+-- | compatible with `callPackage`.
+-- |
+-- | The Nix function this produces will look similar to the following:
+-- |
+-- | ```nix
+-- | { mkDerivation, aeson, base, lib }:
+-- | mkDerivation {
+-- |   pname = "example-cabal-library";
+-- |   version = "0.1.0.0";
+-- |   src = ./.;
+-- |   isLibrary = false;
+-- |   isExecutable = true;
+-- |   executableHaskellDepends = [ aeson base ];
+-- |   license = lib.licenses.bsd3;
+-- | }
+-- | ```
 cabalFileToPackageDef :: CabalFile -> FunctionWithArgs
 cabalFileToPackageDef { name, version, license, executable } =
   mkFunctionWithArgs
     ("mkDerivation" : "lib" : executable.buildDepends)
     \args ->
-      (unsafeGet "mkDerivation" args)
+      (getAttr "mkDerivation" args)
         { pname: name
         , version
         , src: haskellPackagePath
         , isLibrary: false
         , isExecutable: true
-        -- TODO: Don't hard-code these, but pull them out dynamically based on
-        -- executable.buildDepends
-        , executableHaskellDepends: [ unsafeGet "aeson" args, unsafeGet "base" args ]
-        -- TODO: Get the correct license here.
-        , license: "hello"
+        , executableHaskellDepends: map (\buildDepend -> getAttr buildDepend args) executable.buildDepends
+        , license: getAttrFromPath (licenseToAttrPath license) args
         }
 
 packageDef :: FunctionWithArgs
