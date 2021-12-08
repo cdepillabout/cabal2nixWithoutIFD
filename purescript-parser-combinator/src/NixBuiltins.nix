@@ -1,5 +1,7 @@
 
 rec {
+  abort = builtins.abort;
+
   # This is taken from lib/attrsets.nix in Nixpkgs.
   #
   # :: forall a. Array String  -> a -> AttrSet -> a

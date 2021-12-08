@@ -9,8 +9,8 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Show.Generic (genericShow)
 import Data.Tuple.Nested ((/\), type (/\))
-import NixBuiltins (AttrSet, Path, concatChars, getAttr, getAttrFromPath, readFile)
-import Parsec (Parser, alphaNums, char, count, notChar, notChars, oneOf, optional, runParser, sepBy1, space, string)
+import NixBuiltins (AttrSet, Path, abort, concatChars, getAttr, getAttrFromPath, readFile, trace)
+import Parsec (Parser, alphaNums, char, count, eof, notChar, notChars, oneOf, optional, runParser, sepBy1, space, string)
 import Unsafe.Coerce (unsafeCoerce)
 
 undefined :: forall a. a
@@ -22,6 +22,11 @@ type Executable =
   }
 
 data License = LicenseBSD3
+
+derive instance genericLicense :: Generic License _
+
+instance showLicense :: Show License where
+  show = genericShow
 
 type CabalFile =
   { name :: String
@@ -84,7 +89,10 @@ parseRawProps :: IndentAmount -> Parser (Array RawProp)
 parseRawProps indentAmount = some (parseRawProp indentAmount)
 
 parseRawCabalFile :: Parser RawCabalFile
-parseRawCabalFile = map RawCabalFile (parseRawProps 0)
+parseRawCabalFile = do
+  res <- map RawCabalFile (parseRawProps 0)
+  eof
+  pure res
 
 foreign import cabalFilePath :: Path
 
@@ -211,6 +219,7 @@ cabalFileToPackageDef { name, version, license, executable } =
 packageDef :: FunctionWithArgs
 packageDef =
   case cabalParser of
-    -- TODO: Throw an error here or something.
-    Left err -> undefined
-    Right cabalFile -> cabalFileToPackageDef cabalFile
+    Left err -> abort $ "Could not parse cabal file: " <> show err
+    Right cabalFile ->
+      -- trace (show cabalFile) $
+      cabalFileToPackageDef cabalFile

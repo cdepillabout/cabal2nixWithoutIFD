@@ -9,6 +9,8 @@ foreign import data AttrSet :: Type
 
 foreign import data Path :: Type
 
+foreign import abort :: forall a. String  -> a
+
 foreign import attrByPath :: forall a. Array String  -> a -> AttrSet -> a
 
 foreign import concatStringsSep :: String -> Array String -> String
