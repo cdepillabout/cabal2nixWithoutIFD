@@ -221,7 +221,16 @@ cabalFileToPackageDef { name, version, license, executable } =
 -- |
 -- | Check the documentation on `cabalFileToPackageDef` to see what
 -- | the `FunctionWithArgs` this produces looks like.
-
+-- |
+-- | This can be built in the Nix repl like the following:
+-- |
+-- | ```nix
+-- | nix-repl> haskellPackages.callPackage packageDef {}
+-- | «derivation /nix/store/p8ws0vwn26rhnhrqvjqavykbigm1wvla-example-cabal-library-0.1.0.0.drv»
+-- | ```
+-- |
+-- | This is assuming you're in a Nix REPL with everything from Nixpkgs
+-- | available.
 packageDef :: FunctionWithArgs
 packageDef =
   case cabalParser of
@@ -230,11 +239,35 @@ packageDef =
       -- trace (show cabalFile) $
       cabalFileToPackageDef cabalFile
 
+-- | Take Nixpkgs as an argument and produce a `Derivation`
+-- | for `packageDef`.
+-- |
+-- | This is similar to doing `haskellPackages.callPackage packageDef {}`.
+-- |
+-- | ```nix
+-- | nix-repl> examplePackage pkgs
+-- | «derivation /nix/store/p8ws0vwn26rhnhrqvjqavykbigm1wvla-example-cabal-library-0.1.0.0.drv»
+-- | ```
+-- |
+-- | This is assuming you're in a Nix REPL with nixpkgs available as `pkgs`.
 examplePackage :: AttrSet -> Derivation
 examplePackage nixpkgs =
   (nixpkgs !. "haskellPackages" !. "callPackage") packageDef {}
 
+-- | A normal Nixpkgs overlay that adds a top-level derivation called
+-- | `exampleHaskellPackage`.
+-- |
+-- | Check the `../../test.nix` file for an example of how this is used.
+-- |
+-- | ```nix
+-- | nix-repl> nixpkgs = import nixpkgs-src { overlays = [ (import ./output/Main).exampleNixpkgsOverlay ]; }
+-- | nix-repl> nixpkgs.exampleHaskellPackage
+-- | «derivation /nix/store/p8ws0vwn26rhnhrqvjqavykbigm1wvla-example-cabal-library-0.1.0.0.drv»
+-- | ```
+-- |
+-- | This is assuming that `nixpkgs-src` is a `Path` to Nixpkgs`, or has been
+-- retrieved with something like `builtins.fetchTarball`.
 exampleNixpkgsOverlay :: AttrSet -> AttrSet -> { exampleHaskellPackage :: Derivation }
-exampleNixpkgsOverlay final prev =
+exampleNixpkgsOverlay final _prev =
   { exampleHaskellPackage: examplePackage final
   }
