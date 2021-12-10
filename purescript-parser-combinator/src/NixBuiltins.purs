@@ -7,6 +7,8 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | used from unsafe functions like `getAttr`.
 foreign import data AttrSet :: Type
 
+foreign import data Derivation :: Type
+
 foreign import data Path :: Type
 
 foreign import abort :: forall a. String  -> a
@@ -38,6 +40,12 @@ concatChars = unsafeCoerce concatStrs
 
 concatStrs :: Array String -> String
 concatStrs = concatStringsSep ""
+
+-- | A flipped version of `getAttr`.
+getAttrFlip :: forall a. AttrSet -> String -> a
+getAttrFlip attrSet key = getAttr key attrSet
+
+infixl 9 getAttrFlip as !.
 
 unsafeStrToChar :: String -> Char
 unsafeStrToChar = unsafeCoerce

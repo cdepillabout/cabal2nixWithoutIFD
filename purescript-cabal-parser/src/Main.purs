@@ -9,7 +9,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Show.Generic (genericShow)
 import Data.Tuple.Nested ((/\), type (/\))
-import NixBuiltins (AttrSet, Path, abort, concatChars, getAttr, getAttrFromPath, readFile, trace)
+import NixBuiltins (AttrSet, Derivation, Path, abort, concatChars, getAttr, getAttrFromPath, readFile, trace, (!.))
 import Parsec (Parser, alphaNums, char, count, eof, notChar, notChars, oneOf, optional, runParser, sepBy1, space, string)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -216,6 +216,12 @@ cabalFileToPackageDef { name, version, license, executable } =
         , license: getAttrFromPath (licenseToAttrPath license) args
         }
 
+-- | Call `cabalFileToPackageDef` with the `CabalFile` produced by
+-- | `cabalParser`.  Throw an error if `cabalParser` returns `Left`.
+-- |
+-- | Check the documentation on `cabalFileToPackageDef` to see what
+-- | the `FunctionWithArgs` this produces looks like.
+
 packageDef :: FunctionWithArgs
 packageDef =
   case cabalParser of
@@ -223,3 +229,12 @@ packageDef =
     Right cabalFile ->
       -- trace (show cabalFile) $
       cabalFileToPackageDef cabalFile
+
+examplePackage :: AttrSet -> Derivation
+examplePackage nixpkgs =
+  (nixpkgs !. "haskellPackages" !. "callPackage") packageDef {}
+
+exampleNixpkgsOverlay :: AttrSet -> AttrSet -> { exampleHaskellPackage :: Derivation }
+exampleNixpkgsOverlay final prev =
+  { exampleHaskellPackage: examplePackage final
+  }
