@@ -17,6 +17,10 @@ rec {
       else
         default;
 
+  attrUpdate = a: b: a // b;
+
+  attrUpdate' = a: b: a // b;
+
   concatStringsSep = builtins.concatStringsSep;
 
   getAttr = builtins.getAttr;
@@ -35,4 +39,6 @@ rec {
   substring = builtins.substring;
 
   trace = builtins.trace;
+
+  unsafeAdd = a: b: a + b;
 }

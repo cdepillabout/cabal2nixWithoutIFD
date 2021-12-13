@@ -15,6 +15,12 @@ foreign import abort :: forall a. String  -> a
 
 foreign import attrByPath :: forall a. Array String  -> a -> AttrSet -> a
 
+foreign import attrUpdate :: AttrSet -> AttrSet -> AttrSet
+infixr 5 attrUpdate as //
+
+foreign import attrUpdate' :: forall r. AttrSet -> { | r } -> AttrSet
+infixr 5 attrUpdate' as //!
+
 foreign import concatStringsSep :: String -> Array String -> String
 
 foreign import getAttr :: forall a. String -> AttrSet -> a
@@ -28,6 +34,11 @@ foreign import stringLength :: String -> Int
 foreign import substring :: Int -> Int -> String -> String
 
 foreign import trace :: forall a. String -> a -> a
+
+foreign import unsafeAdd :: forall a b c. a -> b -> c
+
+appendPath :: Path -> String -> Path
+appendPath = unsafeAdd
 
 charToStr :: Char -> String
 charToStr = unsafeCoerce
@@ -44,8 +55,10 @@ concatStrs = concatStringsSep ""
 -- | A flipped version of `getAttr`.
 getAttrFlip :: forall a. AttrSet -> String -> a
 getAttrFlip attrSet key = getAttr key attrSet
-
 infixl 9 getAttrFlip as !.
+
+toAttrSet :: forall r. {|r} -> AttrSet
+toAttrSet = unsafeCoerce
 
 unsafeStrToChar :: String -> Char
 unsafeStrToChar = unsafeCoerce
