@@ -368,7 +368,8 @@ type PrevHaskellPackages s = Record (PrevHaskellPackagesRow s)
 -- | in general when typing an overly, `PrevHaskellPackagesRow`
 -- | should get a separate type variable from `FinalHaskellPackagesRow`.
 type FinalHaskellPackagesRow b =
-  ( callCabal2nixWithoutIFDTyped :: String -> Path -> AttrSet -> Derivation
+  ( callCabal2nixWithoutIFDTyped
+      :: String -> Path -> AttrSet -> Derivation
   , exampleHaskellPackageTyped :: Derivation
   | PrevHaskellPackagesRow b
   )
@@ -456,7 +457,7 @@ type ResultOverlay h s t =
 -- | Nix code.
 exampleNixpkgsHaskellOverlayTyped
   :: forall p r h s t
-   . {|p}
+   . Record p
   -> PrevOverlay r h s t
   -> ResultOverlay h s t
 exampleNixpkgsHaskellOverlayTyped _final prev =
