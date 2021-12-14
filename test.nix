@@ -11,6 +11,7 @@ let
   purenix-Main = import ./purescript-cabal-parser/output/Main;
 
   overlays = [
+    # TODO: Write a few comments about what these overlays contain.
     purenix-Main.exampleNixpkgsOverlay
     purenix-Main.exampleNixpkgsHaskellOverlay
     purenix-Main.exampleNixpkgsHaskellOverlayTyped

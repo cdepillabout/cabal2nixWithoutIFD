@@ -343,45 +343,122 @@ callCabal2nixWithoutIFD haskellCallPackage pkgName src overrides =
   in
   haskellCallPackage haskellPkgFunc overrides
 
-type PrevOverlay r h s =
-  { haskell ::
+-- | This is a Row type that corresponds to the previous Haskell
+-- | packages overlay (`hprev`) in the above Nix code.
+-- |
+-- | The only thing we need to pull out of `hprev` is `callPackage`,
+-- | but this overlay contains other things, so this is an
+-- | extensible row type.
+type PrevHaskellPackagesRow a =
+  ( callPackage :: FunctionWithArgs -> AttrSet -> Derivation
+  | a
+  )
+
+-- | Turn `PrevHaskellPackagesRow` into a `Record`.
+type PrevHaskellPackages s = Record (PrevHaskellPackagesRow s)
+
+-- | This is the final Haskell packages overlay.  It corresponds
+-- | to `hfinal` in the above Nix code.
+-- |
+-- | This should contain everything in `PrevHaskellPackagesRow`,
+-- | plus the function `callCabal2nixWithoutIFDTyped`, plus
+-- | `exampleHaskellPackageType`.
+-- |
+-- | Note that there may be more overlays on top of this, so
+-- | in general when typing an overly, `PrevHaskellPackagesRow`
+-- | should get a separate type variable from `FinalHaskellPackagesRow`.
+type FinalHaskellPackagesRow b =
+  ( callCabal2nixWithoutIFDTyped :: String -> Path -> AttrSet -> Derivation
+  , exampleHaskellPackageTyped :: Derivation
+  | PrevHaskellPackagesRow b
+  )
+
+-- | Turn `FinalHaskellPackagesRow` into a `Record`.
+type FinalHaskellPackages s = Record (FinalHaskellPackagesRow s)
+
+-- | The previous Nixpkgs overlay.
+-- |
+-- | Note that the only thing we pull out of the top-level is the
+-- | `haskell` attribute (and `packageOverrides` inside that), so
+-- | it is the only thing we have to type here.
+-- |
+-- | The `r` parameter represents all the additional packages that
+-- | live in the Nixpkgs top-level.  We don't directly use any of
+-- | them here, but `r` represents their existence.
+-- |
+-- | The `h` parameter represents all the additional attributes that
+-- | live in the `haskell` attrset. The only thing we use from this set
+-- | is `packageOverrides`, but `h` represents the existence of all
+-- | the other attributes.
+-- |
+-- | `s` and `t` represent all the Haskell packages and other functions
+-- | that live in a Haskell package set (like Nixpkgs `haskellPackages`).
+-- | Note that `s` and `t` are different because the final Haskell package
+-- | set may have additional packages that the previous package set doesn't
+-- | have.  See the docs for `FinalHaskellPackagesRow` and `PrevHaskellPackagesRow`.
+type PrevOverlayRow r h s t =
+  ( haskell ::
       { packageOverrides
           :: FinalHaskellPackages s
-          -> PrevHaskellPackages s
+          -> PrevHaskellPackages t
           -> FinalHaskellPackages s
       | h
       }
   | r
-  }
+  )
 
-type PrevHaskellPackages s =
-  { callPackage :: FunctionWithArgs -> AttrSet -> Derivation
-  | s
-  }
+-- | Turn `PrevOverlayRow` into a `Record`.
+type PrevOverlay r h s t =
+  Record (PrevOverlayRow r h s t)
 
-type FinalHaskellPackages s =
-  { callPackage :: FunctionWithArgs -> AttrSet -> Derivation
-  , callCabal2nixWithoutIFDTyped :: String -> Path -> AttrSet -> Derivation
-  , exampleHaskellPackageTyped :: Derivation
-  | s
-  }
+-- | This is similar to `PrevOverlay` but due to how Nixpkgs
+-- | overlays work, we are allowed to return an attrset with
+-- | only a single attribute, and only that single attribute
+-- | will be updated.
+type ResultOverlay h s t =
+  Record (PrevOverlayRow () h s t)
 
-type ResultHaskellPackages =
-  { callCabal2nixWithoutIFDTyped :: String -> Path -> AttrSet -> Derivation
-  , exampleHaskellPackageTyped :: Derivation
-  }
-
-type ResultOverlay h s =
-  { haskell ::
-      { packageOverrides
-          :: FinalHaskellPackages s
-          -> PrevHaskellPackages s
-          -> FinalHaskellPackages s
-      | h
-      }
-  }
-
-exampleNixpkgsHaskellOverlayTyped :: forall p r h s. {|p} -> PrevOverlay r h s -> ResultOverlay h s
+-- | This is a Nixpkgs overlay that updates the top-level `haskell` attribute
+-- | in order to add a new Haskell package, as well as the
+-- | `callCabal2nixWithoutIFDTyped` function.  This is the exact same as
+-- | `exampleNixpkgsHaskellOverlay`, but fully typed.
+-- |
+-- | Here is how you could actually use this overlay.
+-- |
+-- | ```nix
+-- | nix-repl> nixpkgs = import nixpkgs-src { overlays = [ (import ./output/Main).exampleNixpkgsHaskellOverlayTyped ]; }
+-- | nix-repl> nixpkgs.haskellPackages.exampleHaskellPackageTyped
+-- | «derivation /nix/store/p8ws0vwn26rhnhrqvjqavykbigm1wvla-example-cabal-library-0.1.0.0.drv»
+-- | ```
+-- |
+-- | See the docs on the `exampleNixpkgsOverlay` for more information.
+-- |
+-- | This overlay is basically the same as the following Nix code:
+-- |
+-- | ```nix
+-- | final: prev: {
+-- |   haskell = prev.haskell // {
+-- |     packageOverrides = hfinal: hprev:
+-- |       prev.haskell.packageOverrides hfinal hprev // {
+-- |         exampleHaskellPackage =
+-- |           hfinal.callCabal2nixWithoutIFD
+-- |             "example-cabal-library"
+-- |             haskellPackagePath
+-- |             { };
+-- |         callCabal2nixWithoutIFD = callCabal2nixWithoutIFD hfinal.callPackage
+-- |       };
+-- |   };
+-- | }
+-- | ```
+-- |
+-- | Adding types to this function is quite annoying and tricky to figure out,
+-- | but the resulting PureScript code looks almost identical to the untyped
+-- | Nix code.
+exampleNixpkgsHaskellOverlayTyped
+  :: forall p r h s t
+   . {|p}
+  -> PrevOverlay r h s t
+  -> ResultOverlay h s t
 exampleNixpkgsHaskellOverlayTyped _final prev =
   { haskell:
       prev.haskell
