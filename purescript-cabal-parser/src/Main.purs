@@ -342,3 +342,58 @@ callCabal2nixWithoutIFD haskellCallPackage pkgName src overrides =
       (haskellPkgFunc :: FunctionWithArgs) = rawCabalFileToPkgDef rawCabalFileString src
   in
   haskellCallPackage haskellPkgFunc overrides
+
+type PrevOverlay r h s =
+  { haskell ::
+      { packageOverrides
+          :: FinalHaskellPackages s
+          -> PrevHaskellPackages s
+          -> FinalHaskellPackages s
+      | h
+      }
+  | r
+  }
+
+type PrevHaskellPackages s =
+  { callPackage :: FunctionWithArgs -> AttrSet -> Derivation
+  | s
+  }
+
+type FinalHaskellPackages s =
+  { callPackage :: FunctionWithArgs -> AttrSet -> Derivation
+  , callCabal2nixWithoutIFDTyped :: String -> Path -> AttrSet -> Derivation
+  , exampleHaskellPackageTyped :: Derivation
+  | s
+  }
+
+type ResultHaskellPackages =
+  { callCabal2nixWithoutIFDTyped :: String -> Path -> AttrSet -> Derivation
+  , exampleHaskellPackageTyped :: Derivation
+  }
+
+type ResultOverlay h s =
+  { haskell ::
+      { packageOverrides
+          :: FinalHaskellPackages s
+          -> PrevHaskellPackages s
+          -> FinalHaskellPackages s
+      | h
+      }
+  }
+
+exampleNixpkgsHaskellOverlayTyped :: forall p r h s. {|p} -> PrevOverlay r h s -> ResultOverlay h s
+exampleNixpkgsHaskellOverlayTyped _final prev =
+  { haskell:
+      prev.haskell
+        { packageOverrides = \hfinal hprev ->
+            (prev.haskell.packageOverrides hfinal hprev)
+              { exampleHaskellPackageTyped =
+                  hfinal.callCabal2nixWithoutIFDTyped
+                    "example-cabal-library"
+                    haskellPackagePath
+                    (toAttrSet {})
+              , callCabal2nixWithoutIFDTyped =
+                  callCabal2nixWithoutIFD hfinal.callPackage
+              }
+        }
+  }

@@ -13,6 +13,7 @@ let
   overlays = [
     purenix-Main.exampleNixpkgsOverlay
     purenix-Main.exampleNixpkgsHaskellOverlay
+    purenix-Main.exampleNixpkgsHaskellOverlayTyped
   ];
 
   pkgs = import nixpkgs-src { inherit overlays; };
