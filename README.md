@@ -1,17 +1,29 @@
 # cabal2nixWithoutIFD
 
-This is a proof-of-concept for a
-[`cabal2nix`](https://github.com/NixOS/cabal2nix) written in Nix. The benefit
-of writting it in Nix instead of Haskell is that is can parse a `.cabal` file
-directly.  It does not rely on
+This repo contains a proof-of-concept for a
+[`callCabal2nix`](https://github.com/NixOS/nixpkgs/blob/d263feb6f6392939c4c5e0a2608a450f65417d18/pkgs/development/haskell-modules/make-package-set.nix#L220)
+function written in Nix. `callCabal2nix` uses
 [Import From Derivation (IFD)](https://blog.hercules-ci.com/2019/08/30/native-support-for-import-for-derivation/)
-to work.
+and a Haskell program [cabal2nix](https://github.com/NixOS/cabal2nix) to take
+a Haskell `.cabal` file (like
+[`example-cabal-library.cabal`](`./example-cabal-library/example-cabal-library.cabal`))
+and translate it into a derivation that can be built with Nix.
 
-Internally we have a PureScript backend that compiles to Nix called
-[`purenix`](./purenix).  We have written a `.cabal` parser in
-PureScript in [`purescript-cabal-parser`](./purescript-cabal-parser) and
-compiled it to Nix.  We can then directly use this from Nix to parse
-a `.cabal` file without IFD.
+One unfortunate part of `callCabal2nix` is that `cabal2nix` is written in
+Haskell, so IFD must be used to build the resulting derivation.  IFD can often
+be slower than just doing things with native Nix, and it is not allowed
+in Nixpkgs.
+
+The `callCabal2nixWithoutIFD` function provided by this repo is written in Nix,
+so it doesn't have either of the above downsides.  Cabal files are parsed in
+Nix directly, so IFD is not needed.
+
+Internally, this `callCabal2nixWithoutIFD` function is written in PureScript
+and transpiled to Nix using [PureNix](https://github.com/purenix-org/purenix).
+Writing a parser for a complicated format like a Cabal file is much more
+reasonable in a language like PureScript than Nix itself.  While this repo
+is just a proof-of-concept, this is an approach that could potentially be
+expanded to write a full parser for `.cabal` files.
 
 ## Running
 
