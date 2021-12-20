@@ -11,7 +11,20 @@ let
   purenix-Main = import ./purescript-cabal-parser/output/Main;
 
   overlays = [
-    # TODO: Write a few comments about what these overlays contain.
+    (final: prev: {
+      exampleHaskellPackageFromNix =
+        let
+          rawCabalFile =
+            builtins.readFile ./example-cabal-library/example-cabal-library.cabal;
+
+          purenixMain = import ./purescript-cabal-parser/output/Main;
+
+          haskellPkgDrv =
+            purenixMain.rawCabalFileToPkgDef rawCabalFile ./example-cabal-library;
+        in
+        final.haskellPackages.callPackage haskellPkgDrv {};
+    })
+
     purenix-Main.exampleNixpkgsOverlay
 
     purenix-Main.exampleNixpkgsHaskellOverlay
