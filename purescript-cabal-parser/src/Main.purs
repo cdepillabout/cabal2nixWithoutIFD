@@ -244,7 +244,7 @@ rawCabalFileToPkgDef rawCabalFileString packageSrc =
 -- | Take Nixpkgs as an argument and produce a `Derivation`
 -- | for `rawCabalFileToPkgDef`.
 -- |
--- | This is similar to doing
+-- | The derivation this produces is similar to the derivation produced from
 -- | `haskellPackages.callPackage (rawCabalFileToPkgDef rawCabalFileStr haskellPackagePath) {}`.
 -- |
 -- | ```nix
@@ -441,12 +441,12 @@ type ResultOverlay h s t =
 -- |   haskell = prev.haskell // {
 -- |     packageOverrides = hfinal: hprev:
 -- |       prev.haskell.packageOverrides hfinal hprev // {
--- |         exampleHaskellPackage =
+-- |         exampleHaskellPackageTyped =
 -- |           hfinal.callCabal2nixWithoutIFD
 -- |             "example-cabal-library"
 -- |             haskellPackagePath
 -- |             { };
--- |         callCabal2nixWithoutIFD = callCabal2nixWithoutIFD hfinal.callPackage
+-- |         callCabal2nixWithoutIFDTyped = callCabal2nixWithoutIFD hfinal.callPackage
 -- |       };
 -- |   };
 -- | }
