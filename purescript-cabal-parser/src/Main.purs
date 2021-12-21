@@ -13,14 +13,19 @@ import NixBuiltins (AttrSet, Derivation, Path, abort, appendPath, concatChars, g
 import Parsec (Parser, alphaNums, char, count, eof, notChar, notChars, oneOf, optional, runParser, sepBy1, space, string)
 import Unsafe.Coerce (unsafeCoerce)
 
-undefined :: forall a. a
-undefined = unsafeCoerce unit
+-- This is useful for "type-driven design", but shouldn't be used in an actual
+-- function.
+-- undefined :: forall a. a
+-- undefined = unsafeCoerce unit
 
+-- | This represents an `executable` section in a Cabal file.
 type Executable =
   { name :: String
   , buildDepends :: Array String
   }
 
+-- | A datatype representing the `license` in a Cabal file.
+-- | This should be expanded to cover more licenses.
 data License = LicenseBSD3
 
 derive instance genericLicense :: Generic License _
@@ -28,6 +33,10 @@ derive instance genericLicense :: Generic License _
 instance showLicense :: Show License where
   show = genericShow
 
+-- | This represents a parsed Cabal file.  Note that for now
+-- | we only parse the fields that are required for the Nix derivation.
+-- | This includes things like `buildDepends`, but not things like
+-- | `default-language`.
 type CabalFile =
   { name :: String
   , version :: String
@@ -37,6 +46,15 @@ type CabalFile =
 
 type IndentAmount = Int
 
+-- | This represents a raw property in a `.cabal` file.
+-- | For instance, Cabal files have a `name` property.
+-- | This `name` property would be created as a `SimpleRawProp`:
+-- |
+-- | ```purescript
+-- | SimpleRawProp "name" "example-cabal-library"
+-- | ```
+-- |
+-- | A `RecursiveRawProp` is used for something like an `executable` section.
 data RawProp = SimpleRawProp String String | RecursiveRawProp String String (Array RawProp)
 
 derive instance genericRawProp :: Generic RawProp _
@@ -44,6 +62,7 @@ derive instance genericRawProp :: Generic RawProp _
 instance showRawProp :: Show RawProp where
   show rawProp = genericShow rawProp
 
+-- | A `RawCabalFile` is an array of `RawProp`s.
 data RawCabalFile = RawCabalFile (Array RawProp)
 
 derive instance genericRawCabalFile :: Generic RawCabalFile _
@@ -94,6 +113,9 @@ parseRawCabalFile = do
   eof
   pure res
 
+-- | This is the Nix `Path` of the `example-cabal-library.cabal` file.
+-- | This is convenient for being able to embed things like `rawCabalFileStr`,
+-- | but this should really be taken as an argument everywhere that needs it.
 foreign import cabalFilePath :: Path
 
 rawCabalFileStr :: String
@@ -166,6 +188,12 @@ cabalFileFromRaw (RawCabalFile rawProps) = do
         }
     }
 
+-- | Parse a raw `.cabal` file into a `CabalFile`.  This function takes a
+-- | `String` of the text of a `.cabal` file.
+-- |
+-- | This function starts by parsing the raw `.cabal` file into key-val mapping
+-- | `RawCabalFile`, and then parses all the required fields from this
+-- | `RawCabalFile` into a `CabalFile`.
 cabalParser :: String -> Either (Array String) CabalFile
 cabalParser rawCabalFileString = do
   case parsedRawCabalFile rawCabalFileString of
@@ -177,10 +205,24 @@ licenseToAttrPath =
   case _ of
     LicenseBSD3 -> ["lib", "licenses", "bsd3"]
 
+-- | This datatype represents a Nix function that takes an attribute set.
+-- |
+-- | For instance, imagine the following Nix function:
+-- |
+-- | ```nix
+-- | { a, b }: a + b
+-- | ```
+-- |
+-- | This could be constructed from PureScript with `mkFunctionWithArgs`:
+-- |
+-- | ```purescript
+-- | mkFunctionWithArgs ["a", "b"] (\args -> (args !. "a") + (args !. "b"))
+-- | ```
 foreign import data FunctionWithArgs :: Type
 
 foreign import haskellPackagePath :: Path
 
+-- |  See the docs on `FunctionWithArgs`.
 foreign import mkFunctionWithArgs
   :: forall a. Array String -> (AttrSet -> a) -> FunctionWithArgs
 
@@ -333,6 +375,11 @@ exampleNixpkgsHaskellOverlay _final prev =
           }
     }
 
+-- | This is just like the Nix function `callCabal2nix`, but uses all the
+-- | machinery defined in this file.
+-- |
+-- | The first argument is the Nix function `haskellPackages.callPackage`, which
+-- | is used internally.
 callCabal2nixWithoutIFD
   :: (FunctionWithArgs -> AttrSet -> Derivation)
   -> String -> Path -> AttrSet -> Derivation
