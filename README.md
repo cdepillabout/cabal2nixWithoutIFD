@@ -144,3 +144,12 @@ datatype.
 There are lots of comments in the
 [`Main.purs`](./purescript-cabal-parser/src/Main.purs) file, so you may want to
 skim through it to see what else is available.
+
+## Caveats
+
+The cabal parser implemented in `./purescript-cabal-parser/` is completely a
+proof-of-concept.  It only parses the absolute simplest of `.cabal` files.
+I wouldn't recommend using it any arbitrary Haskell package.
+
+However, I hope the PureScript code in this repository shows the potential of
+PureNix for writing things that would be difficult in raw Nix.
