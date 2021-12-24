@@ -1,19 +1,34 @@
 # cabal2nixWithoutIFD
 
-This is a proof-of-concept for a
-[`cabal2nix`](https://github.com/NixOS/cabal2nix) written in Nix. The benefit
-of writting it in Nix instead of Haskell is that is can parse a `.cabal` file
-directly.  It does not rely on
+This repo contains a proof-of-concept for a
+[`callCabal2nix`](https://github.com/NixOS/nixpkgs/blob/d263feb6f6392939c4c5e0a2608a450f65417d18/pkgs/development/haskell-modules/make-package-set.nix#L220)
+function written in Nix. `callCabal2nix` uses
 [Import From Derivation (IFD)](https://blog.hercules-ci.com/2019/08/30/native-support-for-import-for-derivation/)
-to work.
+and a Haskell program [cabal2nix](https://github.com/NixOS/cabal2nix) to take
+a Haskell `.cabal` file (like
+[`example-cabal-library.cabal`](`./example-cabal-library/example-cabal-library.cabal`))
+and translate it into a derivation that can be built with Nix.
 
-Internally we have a PureScript backend that compiles to Nix called
-[`purenix`](./purenix).  We have written a `.cabal` parser in
-PureScript in [`purescript-cabal-parser`](./purescript-cabal-parser) and
-compiled it to Nix.  We can then directly use this from Nix to parse
-a `.cabal` file without IFD.
+One unfortunate part of `callCabal2nix` is that `cabal2nix` is written in
+Haskell, so IFD must be used to build the resulting derivation.  IFD can often
+be slower than just doing things with native Nix, and it is not allowed
+in Nixpkgs.
 
-## Running
+This repo provides a `callCabal2nixWithoutIFD` function that is written in Nix,
+so it doesn't have either of the above downsides.  Cabal files are parsed in
+Nix directly, so IFD is not needed.
+
+Internally, this `callCabal2nixWithoutIFD` function is written in PureScript
+and transpiled to Nix using [PureNix](https://github.com/purenix-org/purenix).
+Writing a parser for a complicated format like a Cabal file is much more
+reasonable in a language like PureScript than Nix itself.
+
+While this repo is just a proof-of-concept, this approach of writing a
+complicated parser in PureNix could reasonably be extended to write a full
+parser for `.cabal` files.  Writing a similar parser directly in raw Nix would
+be considerably more difficult.
+
+## Compiling PureScript Code to Nix
 
 Compiling `purescript-cabal-parser` to Nix can be done with the following
 steps.
@@ -27,41 +42,114 @@ $ nix develop
 The, change to `./purescript-cabal-parser` directory and run `spago build`:
 
 ```console
-$ cd ./purescript-cabal-parser
-$ spago build --verbose
+$ cd ./purescript-cabal-parser/
+$ spago build
 ```
 
-`spago build` does the following things:
+This transpiles the PureScript code to Nix.  The transpiled Nix code is placed
+in `./purescript-cabal-parser/output/`.
 
-1.  Looks for all `.purs` files in `./purescript-cabal-parser/src/`.
+## Running Transpiled PureScript Code
 
-    The location to search for `.purs` files can be changed in
-    `./purescript-cabal-parser/spago.dhall`.
+The transpiled PureScript code can be tested by using the [`test.nix`](./test.nix)
+script.
 
-2.  Compile the `.purs` files to corefn and output in
-    `./purescript-cabal-parser/output/`.
+Here's a derivation for a Haskell package that was built using
+`callCabal2nixWithoutIFD`:
 
-    For instance, `./purescript-cabal-parser/src/Main.purs` will be compiled to
-    `./purescript-cabal-parser/output/Main/corefn.json`.
+```console
+$ nix-build ./test.nix -A exampleHaskellPackage
+...
+/nix/store/xb0yxkpzdz3zjqmcxwa9z6r6r98yfizz-example-cabal-library-0.1.0.0
+```
 
-3.  `spago` will try to run the `backend` command defined in
-    `./purescript-cabal-parser/spago.dhall`.
+Here's a derivation for a Haskell package that was built using
+the normal `callCabal2nix`:
 
-    This is set to `cd ../purenix && cabal run purenix`, so the `purenix`
-    executable will be built and run.
+```console
+$ nix-build ./test.nix -A exampleHaskellPackageWithIFD
+...
+/nix/store/xb0yxkpzdz3zjqmcxwa9z6r6r98yfizz-example-cabal-library-0.1.0.0
+```
 
-4.  `purenix` needs to look for all `corefn.json` files in
-    `./purescript-cabal-parser/output/`, translate them to JSON, and then
-    output them somewhere.
+You can disable IFD in Nix and see that the Haskell derivation built with
+`callCabal2nixWithoutIFD` still builds successfully:
 
-    It also needs to take into account the optional FFI files for each PureScript module.
+```console
+$ nix-build --option allow-import-from-derivation false ./test.nix -A exampleHaskellPackage
+...
+/nix/store/xb0yxkpzdz3zjqmcxwa9z6r6r98yfizz-example-cabal-library-0.1.0.0
+$ nix-build --option allow-import-from-derivation false ./test.nix -A exampleHaskellPackageWithIFD
+error: cannot build '/nix/store/q5hq65ynrqnnnjs3kl1ggsx2pkwlw702-cabal2nix-example-cabal-library.drv'
+during evaluation because the option 'allow-import-from-derivation' is disabled
+```
 
-    For instance, if `./purescript-cabal-parser/src/Main.purs` defines FFI
-    functions, there needs to be a corresponding
-    `./purescript-cabal-parser/src/Main.nix` file.
+I recommend reading through the [`test.nix`](./test.nix) file to see what other
+derivations have been defined that you can try building.  The file is heavily
+commented.
 
-    Note that `spago build` does not copy this
-    `./purescript-cabal-parser/src/Main.nix` file to
-    `./purescript-cabal-parser/output/` for us, so we need to explicitly look
-    for `./purescript-cabal-parser/src/Main.nix` in `purenix`.  I haven't yet
-    looked at how other PureScript backends handle this.
+## Playing around in the Nix REPL
+
+You may be interested in taking a look at the PureScript code that defines the
+above derivations.  Most of the interesting code is in
+[`purescript-cabal-parser/src/Main.purs`](./purescript-cabal-parser/src/Main.purs).
+
+You can load the transpiled PureScript code in a Nix REPL to play around with
+it:
+
+```console
+$ cd ./purescript-cabal-parser/
+$ nix repl ./purescript-cabal-parser/output/Main
+```
+
+This puts you in a Nix REPL with all the functions and datatypes from the
+[`Main`](./purescript-cabal-parser/src/Main.purs) module available.
+
+For instance, `Main` defines a function called `cabalParser`:
+
+```purescript
+cabalParser :: String -> Either (Array String) CabalFile
+```
+
+This takes the raw text of a Cabal file and parses it into a `CabalFile`
+datatype:
+
+```purescript
+type CabalFile =
+  { name :: String
+  , version :: String
+  , license :: License
+  , executable :: Executable
+  }
+
+data License = LicenseBSD3
+
+type Executable =
+  { name :: String
+  , buildDepends :: Array String
+  }
+```
+
+Let's try calling `cabalParser` from the Nix REPL:
+
+```nix
+nix-repl> rawCabalFile = builtins.readFile ./
+nix-repl> :p cabalParser rawCabalFile
+{ __field0 = { executable = { buildDepends = [ "base" "aeson" ]; name = "example-cabal-library"; }; license = { __tag = "LicenseBSD3"; }; name = "example-cabal-library"; version = "0.1.0.0"; }; __tag = "Right"; }
+```
+
+If you squint, you can roughly see this attrset corresponds to the `CabalFile`
+datatype.
+
+There are lots of comments in the
+[`Main.purs`](./purescript-cabal-parser/src/Main.purs) file, so you may want to
+skim through it to see what else is available.
+
+## Caveats
+
+The cabal parser implemented in `./purescript-cabal-parser/` is completely a
+proof-of-concept.  It only parses the absolute simplest of `.cabal` files.
+I wouldn't recommend using it any arbitrary Haskell package.
+
+However, I hope the PureScript code in this repository shows the potential of
+PureNix for writing things that would be difficult in raw Nix.

@@ -1,5 +1,5 @@
 { name = "cabal-parser"
-, dependencies = [ "parser-combinator", "prelude" ]
+, dependencies = [ "arrays", "control", "either", "maybe", "parser-combinator", "prelude", "tuples", "unsafe-coerce" ]
 , packages = ../packages.dhall
 , backend = "purenix"
 , sources = [ "src/**/*.purs" ]
